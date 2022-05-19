@@ -7,4 +7,4 @@ Not tested for anything else, but it might work too.
 
 The script generates a folder using a timestamp where it writes the extracted data. What you have to do is to follow the structure above: create the windowsStoreSave folder in the same directory as the script, place the wgs folder inside and launch it. 
 
-Once you have the timestamp folder, copy all its content inside Steam\SteamApps\common\Subnautica[Zero]\SNAppData\SavedGames. 
+Once you have the timestamp folder, copy all its content inside `Steam\SteamApps\common\Subnautica[Zero]\SNAppData\SavedGames`. 
