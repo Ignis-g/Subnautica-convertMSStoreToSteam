@@ -1,4 +1,4 @@
-# Subnautica: converting MS Store save slots To Steam
+# Subnautica: converting MS Store save files To Steam
 
 This little script tries to convert windows store saves (in the wgs folder) to the Steam format for Subnautica and Subnautica: Below Zero.
 Not tested for anything else, but it might work too.
