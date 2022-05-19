@@ -2,6 +2,7 @@
 
 import re
 from os import mkdir, path
+from sys import exit
 from zlib import decompress
 from struct import unpack
 from datetime import date
@@ -42,13 +43,13 @@ def main():
 		try: 
 			mkdir(savePath + timestampStr)
 		except FileExistsError:
-			print(f'The directory {timestampStr} already exists!')
+			exit(f'The directory {timestampStr} already exists!')
 
 		for directory in dirArray:
 			try:
 				mkdir(f'{savePath}{timestampStr}/{directory}')
 			except FileExistsError:
-				print(f'The directory {savePath}{timestampStr}/{directory} already exists!')
+				exit(f'The directory {savePath}{timestampStr}/{directory} already exists!')
 
 			with open(glob(f'{savePath}wgs/{dirArray[directory]}/container.*')[0], 'rb') as f:
 				containerContent = f.read()
