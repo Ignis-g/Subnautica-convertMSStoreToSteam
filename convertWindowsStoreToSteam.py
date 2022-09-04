@@ -9,7 +9,7 @@ from datetime import date
 from time import time
 from glob import glob
 
-savePath = './windowsStoreSave/'
+savePath = './windowsStoreSave'
 
 def retrieveMd5FileName(content):
 	return (content[0:4][::-1].hex() + \
@@ -18,72 +18,79 @@ def retrieveMd5FileName(content):
 			content[8:16].hex()).upper()
 
 def main():
-	with open(savePath + 'wgs/containers.index', 'rb') as f:
-		indexMatch = re.findall(re.compile(rb'\x00{4}\x10\x00{4}(.*?)$', re.MULTILINE|re.DOTALL), f.read())
-	
-	dirArray = {}
+	for mainFolder in glob(f'{savePath}/wgs/*'):
+		extractFolder = mainFolder.replace('wgs/', '')
 
-	if indexMatch is not None:
-		indexContent = indexMatch[0]
+		with open(f'{mainFolder}/containers.index', 'rb') as f:
+			indexMatch = re.findall(re.compile(rb'\x00{4}\x10\x00{4}(.*?)$', re.MULTILINE|re.DOTALL), f.read())
 		
-		while len(indexContent) > 0:
-			numBytes = unpack('<i', indexContent[0:4])[0]
-			indexContent = indexContent[4:]
+		dirArray = {}
 
-			directoryName = unpack(f'<{str(numBytes * 2)}s', indexContent[0:numBytes * 2])[0].replace(b'\x00', b'').decode('ascii')
-			indexContent = indexContent[numBytes * 4 + 4:]
+		if indexMatch is not None:
+			indexContent = indexMatch[0]
+			
+			while len(indexContent) > 0:
+				numBytes = unpack('<i', indexContent[0:4])[0]
+				indexContent = indexContent[4:]
 
-			numBytes = unpack('<i', indexContent[0:4])[0]
-			indexContent = indexContent[9 + numBytes * 2:]
+				directoryName = unpack(f'<{str(numBytes * 2)}s', indexContent[0:numBytes * 2])[0].replace(b'\x00', b'').decode('ascii')
+				indexContent = indexContent[numBytes * 4 + 4:]
 
-			dirArray[directoryName] = retrieveMd5FileName(indexContent[0:16])
-			indexContent = indexContent[40:]
+				numBytes = unpack('<i', indexContent[0:4])[0]
+				indexContent = indexContent[9 + numBytes * 2:]
 
-		timestampStr = str(int(time()))
-		try: 
-			mkdir(savePath + timestampStr)
-		except FileExistsError:
-			exit(f'The directory {timestampStr} already exists!')
+				dirArray[directoryName] = retrieveMd5FileName(indexContent[0:16])
+				indexContent = indexContent[40:]
 
-		for directory in dirArray:
-			try:
-				mkdir(f'{savePath}{timestampStr}/{directory}')
+			timestampStr = str(int(time()))
+
+			if not path.isdir(extractFolder):
+				mkdir(extractFolder)
+
+			try: 
+				mkdir(f'{extractFolder}/{timestampStr}')
 			except FileExistsError:
-				exit(f'The directory {savePath}{timestampStr}/{directory} already exists!')
+				exit(f'The directory {timestampStr} already exists!')
 
-			with open(glob(f'{savePath}wgs/{dirArray[directory]}/container.*')[0], 'rb') as f:
-				containerContent = f.read()
+			for directory in dirArray:
+				try:
+					mkdir(f'{extractFolder}/{timestampStr}/{directory}')
+				except FileExistsError:
+					exit(f'The directory {extractFolder}/{timestampStr}/{directory} already exists!')
 
-			numEntries = unpack('<i', containerContent[4:8])[0]
-			containerContent = containerContent[8:]
-			cpt = 1
-			while numEntries >= cpt:
-				entryContent = containerContent[0:0xa0]
-				containerContent = containerContent[0xa0:]
-				
-				#filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').replace(b'_S', b'/').decode('ascii')
-				filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').decode('ascii')
-				filenameMd5 = retrieveMd5FileName(entryContent[0x80:])
+				with open(glob(f'{mainFolder}/{dirArray[directory]}/container.*')[0], 'rb') as f:
+					containerContent = f.read()
 
-				print(f'{filenamePath} {filenameMd5}')
+				numEntries = unpack('<i', containerContent[4:8])[0]
+				containerContent = containerContent[8:]
+				cpt = 1
+				while numEntries >= cpt:
+					entryContent = containerContent[0:0xa0]
+					containerContent = containerContent[0xa0:]
+					
+					#filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').replace(b'_S', b'/').decode('ascii')
+					filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').decode('ascii')
+					filenameMd5 = retrieveMd5FileName(entryContent[0x80:])
 
-				with open(f'{savePath}wgs/{dirArray[directory]}/{filenameMd5}', 'rb') as f:
-					compressedFileContent = f.read()
+					print(f'{filenamePath} {filenameMd5}')
 
-				arrayPath = filenamePath.split('_S')
-				intermediaryFolder = ''
-				if len(arrayPath) < 2:
-					filename = arrayPath[0]
-				else:
-					intermediaryFolder = arrayPath[0]
-					filename = arrayPath[1]
-					if not path.isdir(f'{savePath}{timestampStr}/{directory}/{intermediaryFolder}'):
-						mkdir(f'{savePath}{timestampStr}/{directory}/{intermediaryFolder}')
+					with open(f'{mainFolder}/{dirArray[directory]}/{filenameMd5}', 'rb') as f:
+						compressedFileContent = f.read()
 
-				with open(f'{savePath}{timestampStr}/{directory}/{intermediaryFolder}/{filename}', 'wb') as f:
-					f.write(decompress(compressedFileContent[4:]))
+					arrayPath = filenamePath.split('_S')
+					intermediaryFolder = ''
+					if len(arrayPath) < 2:
+						filename = arrayPath[0]
+					else:
+						intermediaryFolder = arrayPath[0]
+						filename = arrayPath[1]
+						if not path.isdir(f'{extractFolder}/{timestampStr}/{directory}/{intermediaryFolder}'):
+							mkdir(f'{extractFolder}/{timestampStr}/{directory}/{intermediaryFolder}')
 
-				cpt += 1
+					with open(f'{extractFolder}/{timestampStr}/{directory}/{intermediaryFolder}/{filename}', 'wb') as f:
+						f.write(decompress(compressedFileContent[4:]))
+
+					cpt += 1
 
 if __name__ == "__main__":
 	main()
