@@ -1,96 +1,89 @@
 #!/usr/bin/python
 
 import re
-from os import mkdir, path
-from sys import exit
-from zlib import decompress
-from struct import unpack
-from datetime import date
-from time import time
+import os
+import time
+import struct
+import zlib
+import shutil
 from glob import glob
 
-savePath = './windowsStoreSave'
+SAVE_PATH = './windows_store_save'
 
-def retrieveMd5FileName(content):
-	return (content[0:4][::-1].hex() + \
-			content[4:6][::-1].hex() + \
-			content[6:8][::-1].hex() + \
-			content[8:16].hex()).upper()
+def retrieve_md5_file_name(content):
+    return (content[0:4][::-1].hex() +
+            content[4:6][::-1].hex() +
+            content[6:8][::-1].hex() +
+            content[8:16].hex()).upper()
 
-def main():
-	for mainFolder in glob(f'{savePath}/wgs/*'):
-		extractFolder = mainFolder.replace('wgs/', '')
+def create_directory(directory_path):
+    if not os.path.isdir(directory_path):
+        os.mkdir(directory_path)
 
-		with open(f'{mainFolder}/containers.index', 'rb') as f:
-			indexMatch = re.findall(re.compile(rb'\x00{4}\x10\x00{4}(.*?)$', re.MULTILINE|re.DOTALL), f.read())
-		
-		dirArray = {}
+def extract_files():
+    for main_folder in glob(f'{SAVE_PATH}/wgs/*'):
+        extract_folder = main_folder.replace('wgs/', '')
+        with open(f'{main_folder}/containers.index', 'rb') as f:
+            index_match = re.findall(re.compile(rb'\x00{4}\x10\x00{4}(.*?)$', re.MULTILINE | re.DOTALL), f.read())
 
-		if indexMatch is not None:
-			indexContent = indexMatch[0]
-			
-			while len(indexContent) > 0:
-				numBytes = unpack('<i', indexContent[0:4])[0]
-				indexContent = indexContent[4:]
+        dir_dict = {}
 
-				directoryName = unpack(f'<{str(numBytes * 2)}s', indexContent[0:numBytes * 2])[0].replace(b'\x00', b'').decode('ascii')
-				indexContent = indexContent[numBytes * 4 + 4:]
+        if index_match is not None:
+            index_content = index_match[0]
+            while len(index_content) > 0:
+                num_bytes = struct.unpack('<i', index_content[0:4])[0]
+                index_content = index_content[4:]
+                directory_name = struct.unpack(f'<{str(num_bytes * 2)}s', index_content[0:num_bytes * 2])[0].replace(b'\x00', b'').decode('ascii')
+                index_content = index_content[num_bytes * 4 + 4:]
+                num_bytes = struct.unpack('<i', index_content[0:4])[0]
+                index_content = index_content[9 + num_bytes * 2:]
+                dir_dict[directory_name] = retrieve_md5_file_name(index_content[0:16])
+                index_content = index_content[40:]
 
-				numBytes = unpack('<i', indexContent[0:4])[0]
-				indexContent = indexContent[9 + numBytes * 2:]
+            timestamp_str = str(int(time.time()))
 
-				dirArray[directoryName] = retrieveMd5FileName(indexContent[0:16])
-				indexContent = indexContent[40:]
+            create_directory(extract_folder)
+            create_directory(f'{extract_folder}/{timestamp_str}')
 
-			timestampStr = str(int(time()))
+            for directory in dir_dict:
+                create_directory(f'{extract_folder}/{timestamp_str}/{directory}')
 
-			if not path.isdir(extractFolder):
-				mkdir(extractFolder)
+                with open(glob(f'{main_folder}/{dir_dict[directory]}/container.*')[0], 'rb') as f:
+                    container_content = f.read()
 
-			try: 
-				mkdir(f'{extractFolder}/{timestampStr}')
-			except FileExistsError:
-				exit(f'The directory {timestampStr} already exists!')
+                num_entries = struct.unpack('<i', container_content[4:8])[0]
+                container_content = container_content[8:]
+                count = 1
 
-			for directory in dirArray:
-				try:
-					mkdir(f'{extractFolder}/{timestampStr}/{directory}')
-				except FileExistsError:
-					exit(f'The directory {extractFolder}/{timestampStr}/{directory} already exists!')
+                while num_entries >= count:
+                    entry_content = container_content[0:0xa0]
+                    container_content = container_content[0xa0:]
 
-				with open(glob(f'{mainFolder}/{dirArray[directory]}/container.*')[0], 'rb') as f:
-					containerContent = f.read()
-
-				numEntries = unpack('<i', containerContent[4:8])[0]
-				containerContent = containerContent[8:]
-				cpt = 1
-				while numEntries >= cpt:
-					entryContent = containerContent[0:0xa0]
-					containerContent = containerContent[0xa0:]
-					
 					#filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').replace(b'_S', b'/').decode('ascii')
-					filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').decode('ascii')
-					filenameMd5 = retrieveMd5FileName(entryContent[0x80:])
+                    filename_path = struct.unpack(f'<{str(0x80)}s', entry_content[0:0x80])[0].replace(b'\x00', b'').decode('ascii')
+                    filename_md5 = retrieve_md5_file_name(entry_content[0x80:])
 
-					print(f'{filenamePath} {filenameMd5}')
+                    print(f'{filename_path} {filename_md5}')
 
-					with open(f'{mainFolder}/{dirArray[directory]}/{filenameMd5}', 'rb') as f:
-						compressedFileContent = f.read()
+                    array_path = filename_path.split('_S')
+                    intermediary_folder = ''
+                    if len(array_path) < 2:
+                        filename = array_path[0]
+                    else:
+                        intermediary_folder = array_path[0]
+                        filename = array_path[1]
 
-					arrayPath = filenamePath.split('_S')
-					intermediaryFolder = ''
-					if len(arrayPath) < 2:
-						filename = arrayPath[0]
-					else:
-						intermediaryFolder = arrayPath[0]
-						filename = arrayPath[1]
-						if not path.isdir(f'{extractFolder}/{timestampStr}/{directory}/{intermediaryFolder}'):
-							mkdir(f'{extractFolder}/{timestampStr}/{directory}/{intermediaryFolder}')
+                    if filename_path.endswith('.zip'):
+                        shutil.copy2(f'{main_folder}/{dir_dict[directory]}/{filename_md5}.zip', f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}/{filename}')
+                    else:
+                        with open(f'{main_folder}/{dir_dict[directory]}/{filename_md5}', 'rb') as f:
+                            compressed_file_content = f.read()
+                            create_directory(f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}')
 
-					with open(f'{extractFolder}/{timestampStr}/{directory}/{intermediaryFolder}/{filename}', 'wb') as f:
-						f.write(decompress(compressedFileContent[4:]))
+                        with open(f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}/{filename}', 'wb') as f:
+                            f.write(zlib.decompress(compressed_file_content[4:]))
 
-					cpt += 1
+                    count += 1
 
 if __name__ == "__main__":
-	main()
+    extract_files()
