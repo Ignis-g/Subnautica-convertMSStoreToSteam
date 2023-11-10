@@ -59,7 +59,7 @@ def extract_files():
                     entry_content = container_content[0:0xa0]
                     container_content = container_content[0xa0:]
 
-					#filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').replace(b'_S', b'/').decode('ascii')
+		    #filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').replace(b'_S', b'/').decode('ascii')
                     filename_path = struct.unpack(f'<{str(0x80)}s', entry_content[0:0x80])[0].replace(b'\x00', b'').decode('ascii')
                     filename_md5 = retrieve_md5_file_name(entry_content[0x80:])
 
@@ -72,9 +72,7 @@ def extract_files():
                     else:
                         intermediary_folder = array_path[0]
                         filename = array_path[1]
-
-                    if intermediary_folder != '':
-                        create_directory(f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}')
+                        create_directory(f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}')                
 
                     print(f'{main_folder}/{dir_dict[directory]}/{filename_md5}', f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}/{filename}')
                     if filename_path.endswith('.zip'):
