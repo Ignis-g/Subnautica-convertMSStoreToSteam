@@ -73,12 +73,15 @@ def extract_files():
                         intermediary_folder = array_path[0]
                         filename = array_path[1]
 
+                    if intermediary_folder != '':
+                        create_directory(f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}')
+
+                    print(f'{main_folder}/{dir_dict[directory]}/{filename_md5}', f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}/{filename}')
                     if filename_path.endswith('.zip'):
-                        shutil.copy2(f'{main_folder}/{dir_dict[directory]}/{filename_md5}.zip', f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}/{filename}')
+                        shutil.copy2(f'{main_folder}/{dir_dict[directory]}/{filename_md5}', f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}/{filename}')
                     else:
                         with open(f'{main_folder}/{dir_dict[directory]}/{filename_md5}', 'rb') as f:
-                            compressed_file_content = f.read()
-                            create_directory(f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}')
+                            compressed_file_content = f.read()                
 
                         with open(f'{extract_folder}/{timestamp_str}/{directory}/{intermediary_folder}/{filename}', 'wb') as f:
                             f.write(zlib.decompress(compressed_file_content[4:]))
