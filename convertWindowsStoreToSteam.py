@@ -23,22 +23,25 @@ def create_directory(directory_path):
 def extract_files():
     for main_folder in glob(f'{SAVE_PATH}/wgs/*'):
         extract_folder = main_folder.replace('wgs/', '')
-        with open(f'{main_folder}/containers.index', 'rb') as f:
-            index_match = re.findall(re.compile(rb'\x00{4}\x10\x00{4}(.*?)$', re.MULTILINE | re.DOTALL), f.read())
+
+        file_path = f'{main_folder}/containers.index'
+        if not os.path.exists(file_path):
+            continue
+
+        with open(file_path, 'rb') as f:
+            index_match = re.findall(re.compile(rb'[^\x00]\x00{3}(?:[^\x00]\x00)*?[^\x00]\x00{3}\x22\x00\x30\x00\x78\x00.*?\x00{4}', re.MULTILINE | re.DOTALL), f.read())
 
         dir_dict = {}
 
         if index_match is not None:
-            index_content = index_match[0]
-            while len(index_content) > 0:
+            for index_content in index_match:
                 num_bytes = struct.unpack('<i', index_content[0:4])[0]
                 index_content = index_content[4:]
-                directory_name = struct.unpack(f'<{str(num_bytes * 2)}s', index_content[0:num_bytes * 2])[0].replace(b'\x00', b'').decode('ascii')
-                index_content = index_content[num_bytes * 4 + 4:]
+                directory_name = struct.unpack(f'<{str(num_bytes * 2)}s', index_content[0:num_bytes * 2])[0].decode('utf-16le')
+                index_content = index_content[num_bytes * 2:]
                 num_bytes = struct.unpack('<i', index_content[0:4])[0]
                 index_content = index_content[9 + num_bytes * 2:]
                 dir_dict[directory_name] = retrieve_md5_file_name(index_content[0:16])
-                index_content = index_content[40:]
 
             timestamp_str = str(int(time.time()))
 
@@ -48,7 +51,12 @@ def extract_files():
             for directory in dir_dict:
                 create_directory(f'{extract_folder}/{timestamp_str}/{directory}')
 
-                with open(glob(f'{main_folder}/{dir_dict[directory]}/container.*')[0], 'rb') as f:
+                file_list = glob(f'{main_folder}/{dir_dict[directory]}/container.*')
+                if len(file_list) == 0:
+                    continue
+
+                
+                with open(file_list[0], 'rb') as f:
                     container_content = f.read()
 
                 num_entries = struct.unpack('<i', container_content[4:8])[0]
@@ -59,7 +67,7 @@ def extract_files():
                     entry_content = container_content[0:0xa0]
                     container_content = container_content[0xa0:]
 
-		    #filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').replace(b'_S', b'/').decode('ascii')
+                    #filenamePath = unpack(f'<{str(0x80)}s', entryContent[0:0x80])[0].replace(b'\x00', b'').replace(b'_S', b'/').decode('ascii')
                     filename_path = struct.unpack(f'<{str(0x80)}s', entry_content[0:0x80])[0].replace(b'\x00', b'').decode('ascii')
                     filename_md5 = retrieve_md5_file_name(entry_content[0x80:])
 
