@@ -1,4 +1,4 @@
-# Subnautica: converting MS Store save files To Steam
+# Subnautica: converting MS Store save files to Steam
 
 Python3 required. 
 
