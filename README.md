@@ -2,7 +2,7 @@
 
 Python3 required. 
 
-This little script tries to convert windows store saves (in the wgs folder) to the Steam format for Subnautica and Subnautica: Below Zero.
+This little script tries to convert windows store saves (`%localappdata%\Packages\UnknownWorldsEntertainmen.GAMEPREVIEWSubnautica_bh1f6rvenfkm2\SystemAppData\wgs`) to the Steam format for Subnautica and Subnautica: Below Zero.
 Not tested for anything else, but it might work too.
 
 ![image](https://github.com/user-attachments/assets/dcb9ee21-1f2e-4783-979a-9d696eadcfc7)
